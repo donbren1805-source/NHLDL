@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NHLDL — Salary Cap Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600&family=Roboto+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+  :root {
+    --page-bg: #0D1524;
+    --card-bg: #1B2639;
+    --card-bg-hover: #212F46;
+    --line: #2A3A54;
+    --red: #E4213A;
+    --red-soft: rgba(228,33,58,0.14);
+    --green: #2FB870;
+    --green-soft: rgba(47,184,112,0.14);
+    --flag: #FF6B7D;
+    --ink: #F4F7FB;
+    --muted: #8CA0BC;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--page-bg);
+    color: var(--ink);
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 40px 24px 80px; }
+
+  header.top { text-align: center; margin-bottom: 8px; }
+  .rink-line {
+    height: 6px;
+    max-width: 220px;
+    margin: 0 auto 20px;
+    background: linear-gradient(90deg, transparent, var(--red) 20%, var(--red) 80%, transparent);
+    border-radius: 3px;
+  }
+  .eyebrow {
+    font-family: 'Roboto Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 3px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  h1 {
+    font-family: 'Oswald', sans-serif;
+    font-weight: 700;
+    font-size: clamp(32px, 6vw, 56px);
+    letter-spacing: 0.5px;
+    margin: 0 0 6px;
+    text-transform: uppercase;
+  }
+  .week-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'Oswald', sans-serif;
+    font-size: 15px;
+    letter-spacing: 1px;
+    color: #fff;
+    background: var(--card-bg);
+    padding: 7px 18px 7px 14px;
+    border-radius: 999px;
+    margin-top: 10px;
+  }
+
+  .legend {
+    display: flex; justify-content: center; gap: 22px;
+    margin: 26px 0 36px;
+    font-family: 'Roboto Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    flex-wrap: wrap;
+  }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .dot.green { background: var(--green); }
+  .dot.red { background: var(--red); }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 16px;
+  }
+
+  .card {
+    background: var(--card-bg);
+    border-radius: 14px;
+    padding: 18px 18px 16px;
+    position: relative;
+    overflow: hidden;
+    border-left: 5px solid var(--green);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .card.over { border-left-color: var(--red); }
+  .card:hover {
+    background: var(--card-bg-hover);
+    transform: translateY(-3px);
+    box-shadow: 0 10px 24px rgba(0,0,0,0.4);
+  }
+
+  .card-top {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 14px;
+  }
+  .card-link {
+    display: flex; align-items: center; gap: 12px;
+    text-decoration: none;
+    color: inherit;
+    width: 100%;
+  }
+  .card-link:hover .team-name { text-decoration: underline; }
+  .card-link:hover .logo { transform: scale(1.05); }
+  .logo {
+    width: 52px; height: 52px; flex-shrink: 0;
+    object-fit: contain;
+    transition: transform 0.15s ease;
+  }
+  .team-name {
+    font-family: 'Oswald', sans-serif;
+    font-size: 17px;
+    font-weight: 600;
+    color: #fff;
+    letter-spacing: 0.3px;
+    line-height: 1.15;
+  }
+  .stat-row {
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding: 7px 0;
+    border-top: 1px solid rgba(255,255,255,0.08);
+  }
+  .stat-row:first-of-type { border-top: none; }
+  .stat-label {
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    color: rgba(255,255,255,0.55);
+    text-transform: uppercase;
+  }
+  .stat-value {
+    font-family: 'Roboto Mono', monospace;
+    font-size: 13px;
+    color: #fff;
+    font-weight: 500;
+  }
+  .stat-value.negative { color: var(--flag); }
+  .stat-value.flag { color: var(--flag); }
+
+  .foot {
+    text-align: center;
+    margin-top: 48px;
+    font-size: 12px;
+    color: var(--muted);
+    font-family: 'Roboto Mono', monospace;
+  }
+
+  .state-msg {
+    text-align: center;
+    color: var(--muted);
+    font-family: 'Roboto Mono', monospace;
+    font-size: 13px;
+    padding: 60px 20px;
+  }
+
+  @media (max-width: 480px) {
+    .wrap { padding: 28px 16px 60px; }
+    .grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+    .card { padding: 14px 14px 12px; }
+    .logo { width: 42px; height: 42px; }
+    .team-name { font-size: 14px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="rink-line"></div>
+    <div class="eyebrow">NHLDL</div>
+    <h1>Salary Cap</h1>
+    <div class="week-badge"><span id="weekLabel">Loading week…</span></div>
+  </header>
+
+  <div class="legend">
+    <span><span class="dot green"></span>Roster legal</span>
+    <span><span class="dot red"></span>Roster Illegal</span>
+  </div>
+
+  <div id="grid" class="grid">
+    <div class="state-msg">Loading team data…</div>
+  </div>
+
+  <div class="foot">NHLDL · Data refreshes on page load</div>
+</div>
+
+<script>
+/* ===================== CONFIG ===================== */
+const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSLNlxzgMDDszhGtpNGKHrj7rF0UxlL7__IExMfyBsM5P-k4KNRp20Zcwhgso_MK3oJ9fGdgawStjd6/pub?gid=958051399&single=true&output=csv";
+/* ==================================================== */
+
+const LOGO = {
+  "Anaheim Ducks":"ANA","Boston Bruins":"BOS","Buffalo Sabres":"BUF","Calgary Flames":"CGY",
+  "Carolina Hurricanes":"CAR","Chicago Blackhawks":"CHI","Colorado Avalanche":"COL","Columbus Blue Jackets":"CBJ",
+  "Dallas Stars":"DAL","Detroit Red Wings":"DET","Edmonton Oilers":"EDM","Florida Panthers":"FLA",
+  "Los Angeles Kings":"LAK","Minnesota Wild":"MIN","Montreal Canadiens":"MTL","Nashville Predators":"NSH",
+  "New Jersey Devils":"NJD","New York Islanders":"NYI","New York Rangers":"NYR","Ottawa Senators":"OTT",
+  "Philadelphia Flyers":"PHI","Pittsburgh Penguins":"PIT","San Jose Sharks":"SJS","Seattle Kraken":"SEA",
+  "St. Louis Blues":"STL","Tampa Bay Lightning":"TBL","Toronto Maple Leafs":"TOR","Utah Mammoth":"UTA",
+  "Vancouver Canucks":"VAN","Vegas Golden Knights":"VGK","Washington Capitals":"WSH","Winnipeg Jets":"WPG"
+};
+
+function logoUrl(team) {
+  const code = LOGO[team.trim()];
+  return code ? `https://assets.nhle.com/logos/nhl/svg/${code}_dark.svg` : "";
+}
+
+function firstNumber(str) {
+  const m = String(str).match(/-?\d+/);
+  return m ? parseInt(m[0], 10) : null;
+}
+
+function render(rows, weekNum) {
+  const grid = document.getElementById('grid');
+  const weekLabel = document.getElementById('weekLabel');
+  weekLabel.textContent = weekNum ? `Week ${weekNum}` : "Current Week";
+
+  if (!rows.length) {
+    grid.innerHTML = '<div class="state-msg">No data found. Check that the sheet is published and has rows.</div>';
+    return;
+  }
+
+  grid.innerHTML = rows.map(r => {
+    const team = (r['Team'] || '').trim();
+    if (!team) return '';
+    const capSpace = r['Cap Space'] || '';
+    const spaceFromFloor = r['Space From Floor'] || '';
+    const playersNum = firstNumber(r['Players']);
+    const contractsNum = firstNumber(r['Contracts']);
+    const over = (playersNum !== null && playersNum > 90) || (contractsNum !== null && contractsNum > 50);
+    const capNeg = capSpace.trim().startsWith('-');
+    const floorNeg = spaceFromFloor.trim().startsWith('-');
+
+    return `
+      <div class="card ${over ? 'over' : ''}">
+        <div class="card-top">
+          <a class="card-link" href="${r['URL'] || '#'}" target="_blank" rel="noopener noreferrer">
+            <img class="logo" src="${logoUrl(team)}" alt="${team} logo" onerror="this.style.visibility='hidden'">
+            <div class="team-name">${team}</div>
+          </a>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Cap Space</span>
+          <span class="stat-value ${capNeg ? 'negative' : ''}">${capSpace}</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Space From Floor</span>
+          <span class="stat-value ${floorNeg ? 'negative' : ''}">${spaceFromFloor}</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Players</span>
+          <span class="stat-value ${playersNum > 90 ? 'flag' : ''}">${r['Players'] || ''}</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Contracts</span>
+          <span class="stat-value ${contractsNum > 50 ? 'flag' : ''}">${r['Contracts'] || ''}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function load() {
+  Papa.parse(CSV_URL, {
+    download: true,
+    header: true,
+    skipEmptyLines: true,
+    complete: (results) => {
+      const rows = results.data;
+      const weekNum = rows.length && rows[0]['Week'] ? rows[0]['Week'] : null;
+      render(rows, weekNum);
+    },
+    error: () => {
+      document.getElementById('grid').innerHTML =
+        '<div class="state-msg">Couldn\'t load data right now. Check the published sheet link and try refreshing.</div>';
+    }
+  });
+}
+
+load();
+</script>
+</body>
+</html>
